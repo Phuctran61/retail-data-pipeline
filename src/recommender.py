@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 import numpy as np
 import pandas as pd
+from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -10,14 +11,13 @@ def build_product_recommendations(
 ) -> pd.DataFrame:
     """
     Xây dựng hệ thống gợi ý sản phẩm mua kèm (Item-based Collaborative Filtering)
-    sử dụng độ tương đồng Cosine trên ma trận tương tác Khách hàng - Sản phẩm.
+    sử dụng ma trận thưa CSR (Compressed Sparse Row) và độ tương đồng Cosine.
     """
     with sqlite3.connect(db_path) as conn:
         interactions = pd.read_sql_query(
             """
-            SELECT customer_id, stock_code, COUNT(DISTINCT invoice_no) AS purchase_count
+            SELECT DISTINCT customer_id, stock_code
             FROM fact_sales
-            GROUP BY customer_id, stock_code
             """,
             conn,
         )
@@ -28,35 +28,50 @@ def build_product_recommendations(
     # 1. Lọc nhiễu: Chỉ giữ các sản phẩm có ít nhất `min_buyers` khách hàng khác nhau từng mua
     item_buyer_counts = interactions.groupby("stock_code")["customer_id"].nunique()
     popular_items = item_buyer_counts[item_buyer_counts >= min_buyers].index
-    filtered = interactions[interactions["stock_code"].isin(popular_items)]
+    filtered = interactions[interactions["stock_code"].isin(popular_items)].copy()
 
     print(f"Tổng số sản phẩm trong kho        : {len(item_buyer_counts):,}")
     print(f"Sản phẩm đủ ngưỡng (>= {min_buyers} KH mua) : {len(popular_items):,}")
 
-    # 2. Tạo ma trận nhị phân Customer x Product (1 = đã từng mua, 0 = chưa mua)
-    user_item_matrix = filtered.pivot_table(
-        index="customer_id",
-        columns="stock_code",
-        values="purchase_count",
-        fill_value=0,
-    )
-    user_item_binary = (user_item_matrix > 0).astype(np.float32)
+    # 2. Xây dựng ma trận thưa nhị phân Customer x Product bằng scipy.sparse.csr_matrix
+    cust_cat = pd.Categorical(filtered["customer_id"])
+    item_cat = pd.Categorical(filtered["stock_code"])
 
-    # 3. Tính ma trận Cosine Similarity giữa các cột (sản phẩm với sản phẩm)
-    sim_matrix = cosine_similarity(user_item_binary.T)
-    sim_df = pd.DataFrame(
-        sim_matrix,
-        index=user_item_binary.columns,
-        columns=user_item_binary.columns,
+    user_item_sparse = csr_matrix(
+        (
+            np.ones(len(filtered), dtype=np.float32),
+            (cust_cat.codes, item_cat.codes),
+        ),
+        shape=(len(cust_cat.categories), len(item_cat.categories)),
     )
 
-    # 4. Trích xuất Top N sản phẩm gợi ý cho từng mã hàng
+    sparse_kb = (
+        user_item_sparse.data.nbytes
+        + user_item_sparse.indices.nbytes
+        + user_item_sparse.indptr.nbytes
+    ) / 1024
+    print(
+        f"Kích thước ma trận CSR            : {user_item_sparse.shape[0]:,} x {user_item_sparse.shape[1]:,} "
+        f"({sparse_kb:,.1f} KB RAM)"
+    )
+
+    # 3. Tính ma trận Cosine Similarity trực tiếp trên ma trận thưa chuyển vị (Item x Customer)
+    sim_matrix = cosine_similarity(user_item_sparse.T, dense_output=True)
+    item_codes = item_cat.categories.to_numpy()
+
+    # 4. Trích xuất Top N sản phẩm gợi ý cho từng mã hàng bằng argpartition (O(N) thay vì sort toàn bộ)
     prod_lookup = dim_products.set_index("stock_code")["description"].to_dict()
     rec_records = []
 
-    for stock_code in sim_df.index:
-        top_similar = sim_df[stock_code].drop(stock_code).nlargest(top_n)
-        for rank, (rec_code, score) in enumerate(top_similar.items(), start=1):
+    for idx, stock_code in enumerate(item_codes):
+        scores = sim_matrix[idx].copy()
+        scores[idx] = -1.0  # Loại bỏ chính sản phẩm đang xét
+
+        top_indices = np.argpartition(scores, -top_n)[-top_n:]
+        top_indices = top_indices[np.argsort(scores[top_indices])[::-1]]
+
+        for rank, rec_idx in enumerate(top_indices, start=1):
+            rec_code = item_codes[rec_idx]
             rec_records.append(
                 {
                     "stock_code": stock_code,
@@ -64,7 +79,7 @@ def build_product_recommendations(
                     "rank": rank,
                     "recommended_stock_code": rec_code,
                     "recommended_product_name": prod_lookup.get(rec_code, "UNKNOWN"),
-                    "similarity_score": round(float(score), 4),
+                    "similarity_score": round(float(scores[rec_idx]), 4),
                 }
             )
 
@@ -89,7 +104,6 @@ if __name__ == "__main__":
 
     recommendations = build_product_recommendations(DB_PATH, min_buyers=20, top_n=5)
 
-    # Kiểm thử thực tế trên 2 sản phẩm bán chạy nhất
     for sample_code in ["22423", "85123A"]:
         sample = recommendations[recommendations["stock_code"] == sample_code]
         prod_title = sample["product_name"].iloc[0]
