@@ -46,13 +46,25 @@ retail-data-engineering-pipeline/
 * **Customer Segmentation (K-Means):** Chuẩn hóa đặc trưng RFM (`np.log1p` + `StandardScaler`), xác định 4 cụm hành vi khách hàng; nhóm **VIP / Champions** (687 khách hàng — 15,8%) đóng góp **64,0% tổng doanh thu** (£5,59M).
 * **Product Recommendation:** Tính toán ma trận tương đồng Cosine trên **2.399 sản phẩm chủ lực** (có $\ge 20$ khách hàng mua), lưu trữ trước **11.995 đề xuất mua kèm** vào bảng `mart_product_recommendations` kèm đánh chỉ mục phục vụ truy vấn nhanh.
 
-## 4. Nguồn dữ liệu (Dataset)
+## 4. Trực quan hóa kết quả phân tích (Visual Insights)
+
+### 4.1. Đánh giá số cụm tối ưu (Elbow Method) & Phân bổ doanh thu theo cụm K-Means
+Nhóm **VIP / Champions** chỉ chiếm **15,8%** tổng lượng khách hàng nhưng đóng góp tới **64,0% tổng doanh thu** (£5,59M) — phản ánh rõ quy luật tập trung giá trị trong thương mại điện tử.
+
+| Xác định số cụm tối ưu ($k = 4$) | Tỷ trọng Khách hàng vs. Doanh thu từng cụm |
+| :---: | :---: |
+| ![K-Means Elbow](assets/1_kmeans_elbow.png) | ![Cluster Revenue Share](assets/2_cluster_revenue_share.png) |
+
+### 4.2. Top 10 sản phẩm mang lại doanh thu cao nhất
+![Top 10 Products](assets/3_top_10_products.png)
+
+## 5. Nguồn dữ liệu (Dataset)
 
 * **Bộ dữ liệu:** Online Retail II (UCI Machine Learning Repository / Kaggle)
 * **Quy mô:** 541.910 bản ghi giao dịch bán lẻ trực tuyến (giai đoạn 2010–2011) gồm 8 trường thông tin: `Invoice`, `StockCode`, `Description`, `Quantity`, `InvoiceDate`, `Price`, `Customer ID`, `Country`.
 * **Cách chuẩn bị:** Tải tệp `online_retail_II.csv` từ [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/502/online+retail+ii) và đặt vào đường dẫn `data/raw/online_retail_II.csv` trước khi chạy chương trình.
 
-## 5. Hướng dẫn cài đặt và chạy dự án
+## 6. Hướng dẫn cài đặt và chạy dự án
 
 ```bash
 # 1. Cài đặt các thư viện cần thiết

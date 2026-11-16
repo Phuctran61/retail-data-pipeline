@@ -4,6 +4,7 @@ from src.transform_load import transform_data, build_star_schema, load_to_sqlite
 from src.build_rfm_mart import execute_rfm_sql
 from src.clustering_rfm import load_rfm_mart, preprocess_features, train_and_save_clusters
 from src.recommender import build_product_recommendations
+from src.generate_charts import plot_elbow_curve, plot_cluster_revenue, plot_top_products
 
 
 def run_full_pipeline() -> None:
@@ -11,6 +12,8 @@ def run_full_pipeline() -> None:
     raw_path = project_root / "data" / "raw" / "online_retail_II.csv"
     db_path = project_root / "data" / "processed" / "retail_dw.db"
     sql_path = project_root / "sql" / "rfm_analysis.sql"
+    assets_dir = project_root / "assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
 
     print("BƯỚC 1: KIỂM ĐỊNH DỮ LIỆU THÔ (DATA PROFILING)")
     raw_df = load_raw_data(raw_path)
@@ -35,6 +38,12 @@ def run_full_pipeline() -> None:
 
     print("BƯỚC 5: XÂY DỰNG HỆ THỐNG GỢI Ý SẢN PHẨM")
     build_product_recommendations(db_path, min_buyers=20, top_n=5)
+    print()
+
+    print("BƯỚC 6: XUẤT BIỂU ĐỒ BÁO CÁO TRỰC QUAN")
+    plot_elbow_curve(db_path, assets_dir)
+    plot_cluster_revenue(db_path, assets_dir)
+    plot_top_products(db_path, assets_dir)
     print("\n=== HOÀN TẤT TOÀN BỘ DATA PIPELINE ===")
 
 
