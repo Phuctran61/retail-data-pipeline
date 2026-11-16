@@ -1,6 +1,6 @@
 # End-to-End Retail Data Engineering & Analytics Pipeline
 
-Xây dựng đường ống xử lý dữ liệu bán lẻ trực tuyến (541.910 bản ghi giao dịch) từ dữ liệu thô đến mô hình kho dữ liệu **Star Schema**, phân tích **RFM**, phân cụm khách hàng **K-Means** và hệ thống gợi ý sản phẩm mua kèm (**Item-based Collaborative Filtering**).
+Xây dựng pipeline xử lý dữ liệu bán lẻ trực tuyến (541.910 bản ghi giao dịch) từ dữ liệu thô đến mô hình kho dữ liệu **Star Schema**, phân tích **RFM**, phân cụm khách hàng **K-Means** và hệ thống gợi ý sản phẩm mua kèm (**Item-based Collaborative Filtering**).
 
 ## 1. Kiến trúc luồng dữ liệu (Data Architecture)
 
